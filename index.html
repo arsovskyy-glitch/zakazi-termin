@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Закажи термин</title>
+<style>
+  body { margin:0; font-family: Arial, sans-serif; background:#000; color:#fff; }
+  header { text-align:center; padding:30px 20px; }
+  h1 { font-size:2.5em; margin-bottom:5px; }
+  h2 { font-weight:400; color:#ccc; margin-bottom:20px; }
+  .button { background:#fff; color:#000; padding:15px 25px; border:none; border-radius:12px; cursor:pointer; margin:10px; font-weight:600; }
+  .button:hover { opacity:0.8; }
+  .container { max-width:600px; margin:0 auto; padding:20px; }
+  .hidden { display:none; }
+  select, input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:none; background:#111; color:#fff; }
+  .time-slot { display:inline-block; padding:10px 14px; margin:5px; border-radius:8px; background:#111; cursor:pointer; }
+  .time-slot.selected { background:#fff; color:#000; }
+  .time-slot.taken { background:#444; color:#ccc; cursor:not-allowed; }
+  .slot-container { margin-bottom:20px; }
+  .back-btn { background:#222; color:#fff; }
+  .message { padding:15px; background:#222; border-radius:10px; margin:10px 0; }
+  .booking-item { background:#111; padding:12px; border-radius:10px; margin-bottom:10px; }
+  .booking-item button { margin-top:8px; background:#f66; color:#fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Закажи термин</h1>
+  <h2>Вашиот стил, вашиот термин</h2>
+  <button class="button" onclick="showBooking()">Резервирај термин</button>
+  <button class="button" onclick="showMyBookings()">Мои термини</button>
+</header>
+<div class="container">
+  <div id="booking" class="hidden">
+    <button class="button back-btn" onclick="showHome()">← Назад</button>
+    <h2>Избери ден</h2>
+    <select id="daySelect" onchange="updatePrice()">
+      <option value="Понеделник">Понеделник</option>
+      <option value="Вторник">Вторник</option>
+      <option value="Среда">Среда</option>
+      <option value="Четврток">Четврток</option>
+      <option value="Петок">Петок</option>
+      <option value="Сабота">Сабота</option>
+      <option value="Недела">Недела / Празник</option>
+    </select>
+    <h2>Избери време (12:00–19:00)</h2>
+    <div id="timeSlots" class="slot-container"></div>
+    <h2>Внеси податоци</h2>
+    <input type="text" id="name" placeholder="Име">
+    <input type="text" id="phone" placeholder="Телефон">
+    <button class="button" onclick="confirmBooking()" id="confirmBtn">Потврди (Цена: 300 денари)</button>
+    <div id="message" class="message hidden"></div>
+  </div>
+
+  <div id="myBookings" class="hidden">
+    <button class="button back-btn" onclick="showHome()">← Назад</button>
+    <h2>Мои термини</h2>
+    <div id="bookingsList"></div>
+  </div>
+</div>
+<script>
+const bookings = JSON.parse(localStorage.getItem('bookings') || '{}');
+let selectedTime = null;
+const timeSlots = [];
+for(let h=12; h<19; h++){
+  timeSlots.push(`${h.toString().padStart(2,'0')}:00`);
+  timeSlots.push(`${h.toString().padStart(2,'0')}:30`);
+}
+timeSlots.push('19:00');
+
+function showHome(){
+  document.getElementById('booking').classList.add('hidden');
+  document.getElementById('myBookings').classList.add('hidden');
+  document.querySelector('header').style.display='block';
+  selectedTime=null;
+}
+
+function showBooking(){
+  document.querySelector('header').style.display='none';
+  document.getElementById('booking').classList.remove('hidden');
+  renderTimeSlots();
+  updatePrice();
+}
+
+function showMyBookings(){
+  document.querySelector('header').style.display='none';
+  document.getElementById('myBookings').classList.remove('hidden');
+  renderBookings();
+}
+
+function renderTimeSlots(){
+  const container = document.getElementById('timeSlots');
+  container.innerHTML='';
+  const day = document.getElementById('daySelect').value;
+  timeSlots.forEach(t=>{
+    const slot = document.createElement('div');
+    slot.textContent=t;
+    slot.className='time-slot';
+    if(bookings[`${day}_${t}`]) slot.classList.add('taken');
+    if(selectedTime===t) slot.classList.add('selected');
+    slot.onclick=()=>{
+      if(slot.classList.contains('taken')) return;
+      selectedTime=t;
+      renderTimeSlots();
+    };
+    container.appendChild(slot);
+  });
+}
+
+function updatePrice(){
+  const day = document.getElementById('daySelect').value;
+  const price = (day==='Недела') ? 400 : 300;
+  document.getElementById('confirmBtn').textContent=`Потврди (Цена: ${price} денари)`;
+}
+
+function confirmBooking(){
+  const day = document.getElementById('daySelect').value;
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  if(!name || !phone || !selectedTime){
+    alert('Внесете име, телефон и време.');
+    return;
+  }
+  const key=`${day}_${selectedTime}`;
+  if(bookings[key]){ alert('Овој термин веќе е закажан.'); return; }
+  const price = (day==='Недела') ? 400 : 300;
+  bookings[key]={name, phone, day, time:selectedTime, price};
+  localStorage.setItem('bookings', JSON.stringify(bookings));
+  document.getElementById('message').textContent=`Терминот е успешно закажан: ${day} ${selectedTime} — ${price} денари`;
+  document.getElementById('message').classList.remove('hidden');
+  document.getElementById('name').value='';
+  document.getElementById('phone').value='';
+  selectedTime=null;
+  renderTimeSlots();
+}
+
+function renderBookings(){
+  const container = document.getElementById('bookingsList');
+  container.innerHTML='';
+  const allBookings = Object.values(bookings);
+  if(allBookings.length===0){
+    container.innerHTML='<p>Немате закажани термини.</p>';
+    return;
+  }
+  allBookings.forEach(b=>{
+    const div=document.createElement('div');
+    div.className='booking-item';
+    div.innerHTML=`<strong>${b.day} ${b.time}</strong><br>${b.name} — ${b.phone}<br>Цена: ${b.price} денари`; 
+    const btn=document.createElement('button');
+    btn.textContent='Откажи';
+    btn.onclick=()=>{
+      delete bookings[`${b.day}_${b.time}`];
+      localStorage.setItem('bookings', JSON.stringify(bookings));
+      renderBookings();
+    };
+    div.appendChild(btn);
+    container.appendChild(div);
+  });
+}
+</script>
+</body>
+
+
